@@ -1,15 +1,19 @@
 package helpers
 
 import (
+	"log"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/go-playground/validator"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt"
+	"github.com/joho/godotenv"
 	"github.com/restapi_fiber/config"
 	"github.com/restapi_fiber/models"
 )
+
 
 type ReqLogin struct {
 	Username string `validate:"required,min=6"`
@@ -39,10 +43,16 @@ type CustomClaims struct {
 	UserData models.Users
 	jwt.StandardClaims
 }
-
-
+func goDotEnvVariable(key string) string {
+	err := godotenv.Load(".env")
+	if err != nil {
+	  log.Fatalf("Error loading .env file")
+	}
+	return os.Getenv(key)
+}
 func GenerateAccessToken(user models.Users) string {
-	TokenScret := []byte("TokenScret")
+	env:= goDotEnvVariable("TOKEN_SCRET")
+	TokenScret := []byte(env)
 	Claims:= jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: user.UserId,
 		ExpiresAt:  time.Now().Add(time.Hour * 15).Unix() })
 	Token,err := Claims.SignedString(TokenScret)
@@ -52,7 +62,8 @@ func GenerateAccessToken(user models.Users) string {
 	return Token
 }
 func GenerateRefreshToken (user models.Users) string{
-	TokenScretReft:= []byte("TokenScretReft")
+	Env:= goDotEnvVariable("TOKEN_SCRET_REFT")
+	TokenScretReft:= []byte(Env)
 	ClaimsReft:= CustomClaims{
 		user,
 		jwt.StandardClaims{
@@ -72,8 +83,9 @@ func DecodeTokenIssuerUserId (c *fiber.Ctx)string {
 	if cookie == ""{
 		return ""
 	}
+	env:= goDotEnvVariable("TOKEN_SCRET")
 	Token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
-		return []byte("TokenScret"), nil
+		return []byte(env), nil
 	})
 	if err != nil {
 		return ""
@@ -87,3 +99,4 @@ func DecodeTokenIssuerUserId (c *fiber.Ctx)string {
 		return ""
 	}
 }
+

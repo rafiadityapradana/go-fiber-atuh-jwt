@@ -20,13 +20,13 @@ func AuthData(c *fiber.Ctx ) error {
 				"Data":user,
 			})
 		}
-		c.ClearCookie("GfAtID", "GfSID")
+		c.ClearCookie()
 		c.Status(fiber.StatusInternalServerError)
 		return c.JSON(fiber.Map{
 			"message":"Could not login !",
 		})
 	}else{
-		c.ClearCookie("GfAtID", "GfSID")
+		c.ClearCookie()
 		c.Status(fiber.StatusInternalServerError)
 		return c.JSON(fiber.Map{
 			"message":"Could not login !",

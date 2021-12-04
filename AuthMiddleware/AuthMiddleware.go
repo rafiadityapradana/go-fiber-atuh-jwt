@@ -1,12 +1,15 @@
 package AuthMiddleware
 
 import (
+	"log"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/fiber/v2/utils"
 	"github.com/golang-jwt/jwt"
+	"github.com/joho/godotenv"
 	"github.com/restapi_fiber/config"
 	"github.com/restapi_fiber/models"
 )
@@ -57,6 +60,7 @@ func AuthApi(config ...Config) fiber.Handler {
 	}
 }
 
+
 const (
 	DefaultHeaderAuththentication string = "Authorization"
 )
@@ -64,6 +68,13 @@ type ConfigAuthorization struct {
 	Skip          func(*fiber.Ctx) bool
 	Key           string
 	ValidatorFunc func(*fiber.Ctx, ConfigAuthorization) bool
+}
+func goDotEnvVariable(key string) string {
+	err := godotenv.Load(".env")
+	if err != nil {
+	  log.Fatalf("Error loading .env file")
+	}
+	return os.Getenv(key)
 }
 func DefaultValidatorAuthorizationFunc(c *fiber.Ctx, cfg ConfigAuthorization) bool {
 	headerKey := c.Get(DefaultHeaderAuththentication)
@@ -75,8 +86,9 @@ func DefaultValidatorAuthorizationFunc(c *fiber.Ctx, cfg ConfigAuthorization) bo
 		return false
 	}
 	if headerKey != "" && headerKey == cookie {
+		var ENV = goDotEnvVariable("TOKEN_SCRET")
 		Token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
-			return []byte("TokenScret"), nil
+			return []byte(ENV), nil
 		})
 		if err != nil {
 			return false
@@ -119,7 +131,7 @@ func AuthAuthorization(config ...ConfigAuthorization) fiber.Handler {
 			KeyLookup:      "cookie:GfSID",
 			CookieDomain:   "",
 			CookiePath:     "",
-			CookieSecure:   true,
+			CookieSecure:   false,
 			CookieHTTPOnly: true,
 			CookieSameSite: "",
 			KeyGenerator:   utils.UUIDv4,

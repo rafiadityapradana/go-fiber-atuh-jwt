@@ -32,7 +32,7 @@ func Login(c *fiber.Ctx) error {
 			var GetToken  models.AuthUserTokens
 			OldToken := config.DB.Where("id_user = ?",user.UserId).First(&GetToken)
 			if OldToken.RowsAffected > 0 {
-				config.DB.Model(models.AuthUserTokens{}).Where("user_id = ?",  user.UserId).Updates(models.AuthUserTokens{AccessToken: Token,RefeshToken:TokenReft})
+				config.DB.Model(models.AuthUserTokens{}).Where("id_user = ?",  user.UserId).Updates(models.AuthUserTokens{AccessToken: Token,RefeshToken:TokenReft})
 			}else{
 				NewToken := models.AuthUserTokens{TokenId:uuid.New().String(), IdUser:user.UserId, AccessToken: Token, RefeshToken: TokenReft}
 				config.DB.Create(&NewToken)
@@ -43,7 +43,7 @@ func Login(c *fiber.Ctx) error {
 				KeyLookup:      "cookie:GfSID",
 				CookieDomain:   "",
 				CookiePath:     "",
-				CookieSecure:   true,
+				CookieSecure:   false,
 				CookieHTTPOnly: true,
 				CookieSameSite: "",
 				KeyGenerator:   utils.UUIDv4,
@@ -56,7 +56,7 @@ func Login(c *fiber.Ctx) error {
 				Domain:   "",
 				MaxAge:   0,
 				Expires:  time.Now().Add(time.Hour * 15),
-				Secure:   true,
+				Secure:   false,
 				HTTPOnly: true,
 				SameSite: "lax",
 			}
