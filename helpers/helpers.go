@@ -2,8 +2,13 @@ package helpers
 
 import (
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator"
+	"github.com/gofiber/fiber/v2"
+	"github.com/golang-jwt/jwt"
+	"github.com/restapi_fiber/config"
+	"github.com/restapi_fiber/models"
 )
 
 type ReqLogin struct {
@@ -21,7 +26,6 @@ func ValidateStruct(req ReqLogin) []*ErrorResponseLogin {
 	err := validate.Struct(req)
 	if err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
-	
 			var data = []string{"This",err.Field(), "must be", err.Tag(), err.Param()}
 			var element ErrorResponseLogin
 			element.FailedField = err.Field()	
@@ -29,6 +33,57 @@ func ValidateStruct(req ReqLogin) []*ErrorResponseLogin {
 			errors = append(errors, &element)
 		}
 	}
-	
 	return errors
+}
+type CustomClaims struct {
+	UserData models.Users
+	jwt.StandardClaims
+}
+
+
+func GenerateAccessToken(user models.Users) string {
+	TokenScret := []byte("TokenScret")
+	Claims:= jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: user.UserId,
+		ExpiresAt:  time.Now().Add(time.Hour * 15).Unix() })
+	Token,err := Claims.SignedString(TokenScret)
+	if err != nil{
+		return ""
+	}	
+	return Token
+}
+func GenerateRefreshToken (user models.Users) string{
+	TokenScretReft:= []byte("TokenScretReft")
+	ClaimsReft:= CustomClaims{
+		user,
+		jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(time.Hour * 24).Unix(),
+			Issuer:    user.UserId,
+		},
+	}
+	CreateTokenReft := jwt.NewWithClaims(jwt.SigningMethodHS256, ClaimsReft)
+	TokenReft,err := CreateTokenReft.SignedString([]byte(TokenScretReft))
+	if err != nil{
+		return ""
+	}
+	return TokenReft
+}
+func DecodeTokenIssuerUserId (c *fiber.Ctx)string {
+	cookie := c.Cookies("GfAtID")
+	if cookie == ""{
+		return ""
+	}
+	Token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte("TokenScret"), nil
+	})
+	if err != nil {
+		return ""
+	}
+	Isclaims:= Token.Claims.(*jwt.StandardClaims)
+	var user models.Users 
+	result := config.DB.Where("user_id = ?",Isclaims.Issuer).First(&user)
+	if result.RowsAffected > 0 {
+		return Isclaims.Issuer
+	}else{
+		return ""
+	}
 }

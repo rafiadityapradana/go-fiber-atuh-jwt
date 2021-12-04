@@ -4,7 +4,8 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/golang-jwt/jwt"
+	"github.com/gofiber/fiber/v2/middleware/session"
+	"github.com/gofiber/fiber/v2/utils"
 	"github.com/google/uuid"
 	"github.com/restapi_fiber/config"
 	"github.com/restapi_fiber/helpers"
@@ -13,94 +14,71 @@ import (
 )
 
 func Login(c *fiber.Ctx) error {
-	TokenScret := []byte("TokenScret")
- 	TokenScretReft:= []byte("TokenScretReft")
 	Req := new(helpers.ReqLogin)
 	if err := c.BodyParser(Req); err != nil {
-        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-            "message": err.Error(),
-        })
+        return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"message": err.Error()})
     }
 	errors := helpers.ValidateStruct(*Req)
-    if errors != nil {
-       return c.JSON(errors)
-    }
+    if errors != nil {return c.JSON(errors)}
 	var user models.Users 
-	result := config.DB.Where("username = ?",Req.Username).Or("email = ? ",Req.Username).First(&user)
+	result := config.DB.Where("username = ?",Req.Username).First(&user)
 	if result.RowsAffected > 0 {
 		if err := bcrypt.CompareHashAndPassword(user.Password, []byte(Req.Password)); err != nil {
 			c.Status(fiber.StatusBadRequest)
-			return c.JSON(fiber.Map{
-				"message":"Incorrect password !",
-			})
+			return c.JSON(fiber.Map{"message":"Incorrect password !"})
 		}else{
-			type CustomClaims struct {
-				UserData models.Users
-				jwt.StandardClaims
+			var Token = helpers.GenerateAccessToken(user)
+			var TokenReft = helpers.GenerateRefreshToken(user)
+			var GetToken  models.AuthUserTokens
+			OldToken := config.DB.Where("id_user = ?",user.UserId).First(&GetToken)
+			if OldToken.RowsAffected > 0 {
+				config.DB.Model(models.AuthUserTokens{}).Where("user_id = ?",  user.UserId).Updates(models.AuthUserTokens{AccessToken: Token,RefeshToken:TokenReft})
+			}else{
+				NewToken := models.AuthUserTokens{TokenId:uuid.New().String(), IdUser:user.UserId, AccessToken: Token, RefeshToken: TokenReft}
+				config.DB.Create(&NewToken)
 			}
-			Claims:= jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{Issuer: user.UserId,
-				ExpiresAt:  time.Now().Add(time.Hour * 5).Unix() })
-			ClaimsReft:= CustomClaims{
-				user,
-				jwt.StandardClaims{
-					ExpiresAt: time.Now().Add(time.Hour * 15).Unix(),
-					Issuer:    user.UserId,
-				},
+			store := session.New(session.Config{
+				Expiration:     15 * time.Hour,
+				Storage:        nil,
+				KeyLookup:      "cookie:GfSID",
+				CookieDomain:   "",
+				CookiePath:     "",
+				CookieSecure:   false,
+				CookieHTTPOnly: true,
+				CookieSameSite: "",
+				KeyGenerator:   utils.UUIDv4,
+				CookieName:     "",
+			})
+			cookie := fiber.Cookie{
+				Name:     "GfAtID",
+				Value:    Token,
+				Path:     "",
+				Domain:   "",
+				MaxAge:   0,
+				Expires:  time.Now().Add(time.Hour * 15),
+				Secure:   false,
+				HTTPOnly: true,
+				SameSite: "lax",
 			}
-			CreateTokenReft := jwt.NewWithClaims(jwt.SigningMethodHS256, ClaimsReft)
-			Token,errToken := Claims.SignedString(TokenScret) 
-			TokenReft, errTokenReft := CreateTokenReft.SignedString([]byte(TokenScretReft))
-			if errToken != nil {
+			SessionStore, err := store.Get(c)
+			if err != nil {
 				c.Status(fiber.StatusInternalServerError)
-				return c.JSON(fiber.Map{
-					"message":"Could not login !",
-				})
-			}else {
-				if errTokenReft != nil {
-					c.Status(fiber.StatusInternalServerError)
-					return c.JSON(fiber.Map{
-						"message":"Reft Could not login !",
-					})
-				}else{
-					var GetToken  models.AuthUserTokens
-					OldToken := config.DB.Where("user_id = ?",user.UserId).First(&GetToken)
-					if OldToken.RowsAffected > 0 {
-						config.DB.Model(models.AuthUserTokens{}).Where("user_id = ?",  user.UserId).Updates(models.AuthUserTokens{AccessToken: Token,RefeshToken:TokenReft})
-					}else{
-						NewToken := models.AuthUserTokens{TokenId:uuid.New().String(), UserId:user.UserId, AccessToken: Token, RefeshToken: TokenReft}
-						 config.DB.Create(&NewToken)
-					}
-					cookie := fiber.Cookie{
-						Name: "GFATID",
-						Value: Token,
-						Expires: time.Now().Add(time.Hour * 15),
-						HTTPOnly: true,
-						SameSite: "lax",
-						Secure: true,
-					}
-					cookieReft := fiber.Cookie{
-						Name: "GFRTID",
-						Value: TokenReft,
-						Expires: time.Now().Add(time.Hour * 24),
-						HTTPOnly: true,
-						SameSite: "lax",
-						Secure: true,
-					}
-					c.Cookie(&cookie)
-					c.Cookie(&cookieReft)
-					c.Status(fiber.StatusOK)
-					return c.JSON(fiber.Map{
-						"AccessToken":Token,
-						"RefeshToken":TokenReft,
-					})
-				}
-				
+				return c.JSON(fiber.Map{"message":" Could not login !"})
 			}
-		}
+			if errSaveSession := SessionStore.Save(); errSaveSession != nil {
+				c.Status(fiber.StatusInternalServerError)
+				return c.JSON(fiber.Map{"message":errSaveSession})
+			}
+			SessionStore.Set("GfSID", Token)
+			c.Cookie(&cookie)			
+			c.Status(fiber.StatusOK)
+			return c.JSON(fiber.Map{
+				"AccessToken":Token,
+				"RefeshToken":TokenReft,
+			})		
+		}	
 	}else{
 		c.Status(fiber.StatusNotFound)
-		return c.JSON(fiber.Map{
-			"message":"Usename not found !",
-		})
+		return c.JSON(fiber.Map{"message":"Usename not found !"})
 	}
 }		

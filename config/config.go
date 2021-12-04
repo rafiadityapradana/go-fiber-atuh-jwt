@@ -15,5 +15,6 @@ func ConnectionDataBase () {
 		panic("Connection Databse Failed")
 	}
 	DB= Connection
-	Connection.AutoMigrate(&models.Users{},&models.AuthUserTokens{})
+	Connection.AutoMigrate(&models.Users{},&models.AuthUserTokens{},&models.Roles{})
 }
+
