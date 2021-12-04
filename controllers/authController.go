@@ -6,7 +6,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/fiber/v2/utils"
-	"github.com/google/uuid"
 	"github.com/restapi_fiber/config"
 	"github.com/restapi_fiber/helpers"
 	"github.com/restapi_fiber/models"
@@ -30,12 +29,12 @@ func Login(c *fiber.Ctx) error {
 			var Token = helpers.GenerateAccessToken(user)
 			var TokenReft = helpers.GenerateRefreshToken(user)
 			var GetToken  models.AuthUserTokens
-			OldToken := config.DB.Where("id_user = ?",user.UserId).First(&GetToken)
+			OldToken := config.DB.Where("token_user_id = ?",user.UserId).First(&GetToken)
 			if OldToken.RowsAffected > 0 {
-				config.DB.Model(models.AuthUserTokens{}).Where("id_user = ?",  user.UserId).Updates(models.AuthUserTokens{AccessToken: Token,RefeshToken:TokenReft})
+				config.DB.Model(models.AuthUserTokens{}).Where("token_user_id = ?",  user.UserId).Updates(models.AuthUserTokens{AccessToken: Token,RefeshToken:TokenReft})
 			}else{
-				NewToken := models.AuthUserTokens{TokenId:uuid.New().String(), IdUser:user.UserId, AccessToken: Token, RefeshToken: TokenReft}
-				config.DB.Create(&NewToken)
+				c.Status(fiber.StatusInternalServerError)
+				return c.JSON(fiber.Map{"message":" Internal Server Error !"})
 			}
 			store := session.New(session.Config{
 				Expiration:     15 * time.Hour,

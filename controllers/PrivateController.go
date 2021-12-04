@@ -10,10 +10,10 @@ import (
 func AuthData(c *fiber.Ctx ) error {
 	UID := helpers.DecodeTokenIssuerUserId(c)
 	var user models.Users 
-	Result :=config.DB.Joins("Roles").Where("user_id = ?",UID).Find(&user)
+	Result :=config.DB.Joins("Roles").Joins("AuthUserTokens").Where("user_id = ?",UID).Find(&user)
 	if Result.RowsAffected > 0 {
 		var GetToken  models.AuthUserTokens
-		Token := config.DB.Where("id_user = ?",user.UserId).First(&GetToken)
+		Token := config.DB.Where("token_user_id = ?",user.UserId).First(&GetToken)
 		if Token.RowsAffected > 0 {
 			c.Status(fiber.StatusOK)
 			return c.JSON(fiber.Map{
