@@ -43,7 +43,7 @@ func Login(c *fiber.Ctx) error {
 				KeyLookup:      "cookie:GfSID",
 				CookieDomain:   "",
 				CookiePath:     "",
-				CookieSecure:   false,
+				CookieSecure:   true,
 				CookieHTTPOnly: true,
 				CookieSameSite: "",
 				KeyGenerator:   utils.UUIDv4,
@@ -56,7 +56,7 @@ func Login(c *fiber.Ctx) error {
 				Domain:   "",
 				MaxAge:   0,
 				Expires:  time.Now().Add(time.Hour * 15),
-				Secure:   false,
+				Secure:   true,
 				HTTPOnly: true,
 				SameSite: "lax",
 			}

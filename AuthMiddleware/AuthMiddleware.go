@@ -119,7 +119,7 @@ func AuthAuthorization(config ...ConfigAuthorization) fiber.Handler {
 			KeyLookup:      "cookie:GfSID",
 			CookieDomain:   "",
 			CookiePath:     "",
-			CookieSecure:   false,
+			CookieSecure:   true,
 			CookieHTTPOnly: true,
 			CookieSameSite: "",
 			KeyGenerator:   utils.UUIDv4,
