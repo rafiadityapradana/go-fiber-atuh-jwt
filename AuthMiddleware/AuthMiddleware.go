@@ -59,8 +59,6 @@ func AuthApi(config ...Config) fiber.Handler {
 		return c.Next()
 	}
 }
-
-
 const (
 	DefaultHeaderAuththentication string = "Authorization"
 )
@@ -152,5 +150,96 @@ func AuthAuthorization(config ...ConfigAuthorization) fiber.Handler {
 				"message":"Unauthorized",
 			})
 		}	
+	}
+}
+
+
+const (
+	DefaultHeaderAuththenticationReft string = "RefreshAuthorization"
+)
+type ConfigAuthorizationReft struct {
+	Skip          func(*fiber.Ctx) bool
+	Key           string
+	ValidatorFunc func(*fiber.Ctx, ConfigAuthorizationReft) bool
+}
+func DefaultValidatorAuthorizationFuncReft(c *fiber.Ctx, cfg ConfigAuthorizationReft) bool {
+	headerKey := c.Get(DefaultHeaderAuththenticationReft)
+	Baseheader:= c.Get(DefaultHeaderAuththentication)
+	cookie := c.Cookies("GfAtID")
+	if headerKey == "" {
+		return false
+	}
+	if cookie == "" { 
+		return false
+	}
+	if Baseheader != "" && Baseheader == cookie{
+		if headerKey != "" {
+			var ENV = goDotEnvVariable("TOKEN_SCRET_REFT")
+			Token, err := jwt.ParseWithClaims(headerKey, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
+				return []byte(ENV), nil
+			})
+			if err != nil {
+				return false
+			}
+			Isclaims:= Token.Claims.(*jwt.StandardClaims)
+			var user models.Users 
+			result := config.DB.Where("user_id = ?",Isclaims.Issuer).First(&user)
+			if result.RowsAffected > 0 {
+				return true
+			}else{
+				return false
+			}
+		}
+	}	
+	return false
+}
+var defaultConfigauthorizationReft = ConfigAuthorizationReft{
+	ValidatorFunc: DefaultValidatorAuthorizationFuncReft,
+}
+func AuthAuthorizationReft(config ...ConfigAuthorizationReft) fiber.Handler {
+	var cfg ConfigAuthorizationReft
+	if len(config) == 0 {
+		cfg = defaultConfigauthorizationReft
+	} else {
+		cfg = config[0]
+		if cfg.ValidatorFunc == nil {
+			cfg.ValidatorFunc = DefaultValidatorAuthorizationFuncReft
+		}
+	}
+	return func(c *fiber.Ctx) error {
+		pass := cfg.ValidatorFunc(c, cfg)
+		if !pass {
+			c.Status(fiber.StatusBadRequest)
+			return c.JSON(fiber.Map{
+				"message":"Unauthorized",
+			})
+		}
+		store := session.New(session.Config{
+			Expiration:     15 * time.Hour,
+			Storage:        nil,
+			KeyLookup:      "cookie:GfSID",
+			CookieDomain:   "",
+			CookiePath:     "",
+			CookieSecure:   false,
+			CookieHTTPOnly: true,
+			CookieSameSite: "",
+			KeyGenerator:   utils.UUIDv4,
+			CookieName:     "",
+		})
+		SessionStore, err := store.Get(c)
+		if err != nil {
+			c.Status(fiber.StatusInternalServerError)
+			return c.JSON(fiber.Map{
+				"message":" Could not login !",
+			})
+		}
+		if SessionStore.ID() != "" && SessionStore.ID() == c.Cookies("GfSID"){
+			return c.Next()
+		}else{
+			c.Status(fiber.StatusBadRequest)
+			return c.JSON(fiber.Map{
+				"message":"Unauthorized",
+			})
+		}
 	}
 }
